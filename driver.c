@@ -2,12 +2,13 @@
  *  hello-1.c - The simplest kernel module.
  */
 
-#include <linux/input.h>
+#include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/init.h>
 
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
+#include <linux/input.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -17,8 +18,6 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Jack Newcombe");
 MODULE_DESCRIPTION("Intercepts a button press on GPIO Pin 18");
 MODULE_VERSION("0.1");
-
-static unsigned int irqNumber;
 
 static const int gpio_pin_map[] = {
 	17,		// A Button
@@ -37,12 +36,12 @@ struct pad_state {
 	unsigned int gpio_state;
 	signed int primary_x;
 	signed int primary_y;
-}
+};
 
 struct pad_data {
 	struct input_dev *device;
 	struct pad_state *pad_state;
-}
+};
 
 static int read_bytes_i2c(u8 register)
 {
@@ -64,11 +63,14 @@ static int setup_i2c()
 	return 0;
 }
 
-static int setup_gpios()
+struct pad_data* pad_data;
+
+static int setup_gpios(void) 
 {
 	int result;
-
-	for(int i = 0; i < gpio_pin_map_count; i++) {
+	int i;
+	
+	for(i = 0; i < gpio_pin_map_count; i++) {
 		int gpio_pin = gpio_pin_map[i];
 		result = gpio_request(gpio_pin, "sysfs");
 
@@ -89,14 +91,13 @@ static void setup_device_axis(struct input_dev* device, unsigned int axis)
 	input_set_abs_params(device, axis, -127, 128, 0, 0);
 }
 
-static int setup_device(struct pad_data* pad_data)
+static int setup_device(void) 
 {
 
 	// Create the device
 	pad_data->device = input_allocate_device();
 	if (!pad_data->device) {
 		printk(KERN_ERR "enough memory\n");
-		error = -ENOMEM;
 		return -1;
 	}
 
@@ -124,8 +125,8 @@ static int setup_device(struct pad_data* pad_data)
 
 static int __init button_init(void)
 {
-	struct pad_data *pad_data;
-
+	int error;
+	
 	printk(KERN_INFO "Loading gamepad module ...\n");
 
 	// Allocate memory to store our pad data
@@ -134,9 +135,10 @@ static int __init button_init(void)
 	setup_gpios();
 	setup_i2c();
 
-	setup_device(pad_data);
-
-
+	setup_device();
+	
+	
+	// TODO: setup timer
 
 	error = input_register_device(pad_data->device);
 	if (error) {
@@ -148,17 +150,15 @@ static int __init button_init(void)
 
  err_free_dev:
 	input_free_device(pad_data->device);
-
+	return -1;
 }
 
 static void __exit button_exit(void)
 {
     input_unregister_device(pad_data->device);
-
-	free_irq(irqNumber, NULL);
-
-	gpio_unexport(gpioPin);
-	gpio_free(gpioPin);
+	
+	// TODO: free gpio pins
+	// TODO: tear down i2c
 }
 
 module_init(button_init);
