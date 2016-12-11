@@ -2,7 +2,7 @@
  *  hello-1.c - The simplest kernel module.
  */
 
-#include <linux/slab.h>
+#include <linux/input.h>
 #include <linux/module.h>
 #include <linux/init.h>
 
@@ -52,7 +52,7 @@ static int setup_i2c()
 {
 	char filename[20] = "/dev/i2c-1";
 
-	i2c_file = open(filename, O_RDWR);
+	i2c_file = sys_open(filename, O_RDWR);
 	int addr = 0x48; /* The I2C address */
 
 	if (ioctl(file, I2C_SLAVE, addr) < 0) {
@@ -69,7 +69,7 @@ static int setup_gpios(void)
 {
 	int result;
 	int i;
-	
+
 	for(i = 0; i < gpio_pin_map_count; i++) {
 		int gpio_pin = gpio_pin_map[i];
 		result = gpio_request(gpio_pin, "sysfs");
